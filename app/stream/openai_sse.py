@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 from ..fc.parse import create_sieve, parse_text_to_calls, to_openai_tool_calls
@@ -75,6 +76,9 @@ async def stream_native_passthrough(
         yield done_frame()
 
 
+def _filter_xyml_tags(text: str) -> str:
+    """过滤残留的 XYML/DSML 标签，防止泄露到客户端。"""
+    return re.sub(r"<[|｜] ?[|｜] ?(XYML|DSML)[|｜] ?[|｜] ?[^>]*>", "", text, flags=re.IGNORECASE)
 async def stream_prompt_fc(
     line_iter: AsyncIterator[str],
     *,
@@ -157,9 +161,11 @@ async def stream_prompt_fc(
                 if sev.get("type") == "content":
                     text = str(sev.get("text") or "")
                     if text:
-                        yield format_sse(
-                            _chunk(model=model, delta={"content": text}, chunk_id=chunk_id)
-                        )
+                        text = _filter_xyml_tags(text)
+                        if text:
+                            yield format_sse(
+                                _chunk(model=model, delta={"content": text}, chunk_id=chunk_id)
+                            )
                 elif sev.get("type") == "tool_calls":
                     calls = _raw_to_calls(sev.get("calls") or [])
                     if calls:
@@ -175,7 +181,9 @@ async def stream_prompt_fc(
             if sev.get("type") == "content":
                 text = str(sev.get("text") or "")
                 if text:
-                    yield format_sse(_chunk(model=model, delta={"content": text}, chunk_id=chunk_id))
+                    text = _filter_xyml_tags(text)
+                    if text:
+                        yield format_sse(_chunk(model=model, delta={"content": text}, chunk_id=chunk_id))
             elif sev.get("type") == "tool_calls" and not emitted_calls:
                 calls = _raw_to_calls(sev.get("calls") or [])
                 if calls:
