@@ -52,72 +52,6 @@ def _prepare_tools_for_prompt(req: CanonicalRequest, config: AppConfig) -> Dict[
     return mapping
 
 
-def _count_chars(messages: List[Message]) -> int:
-    """计算消息列表的总字符数"""
-    return sum(len(msg.content or "") for msg in messages)
-
-
-async def _compress_messages(
-    req: CanonicalRequest,
-    config: AppConfig,
-    upstream_cfg: UpstreamConfig,
-) -> None:
-    """当消息总字符数超过阈值时，对历史消息进行摘要压缩"""
-    if not config.features.compress_enabled:
-        return
-
-    total_chars = _count_chars(req.messages)
-    if total_chars <= config.features.compress_max_chars:
-        return
-
-    keep_recent = config.features.compress_keep_recent
-    if len(req.messages) <= keep_recent + 4:
-        return
-
-    recent_msgs = req.messages[-keep_recent:]
-    old_msgs = req.messages[:-keep_recent]
-
-    old_content = "\n".join(
-        f"[{msg.role}]: {msg.content[:500]}..." if len(msg.content or "") > 500 else f"[{msg.role}]: {msg.content}"
-        for msg in old_msgs
-    )
-
-    summary_prompt = f"请将以下对话历史压缩为一段简洁的摘要，保留关键信息和上下文：\n\n{old_content}\n\n摘要："
-
-    summary_req = CanonicalRequest(
-        model=config.features.compress_summary_model or req.model,
-        messages=[Message(role="user", content=summary_prompt)],
-        tools=[],
-        stream=False,
-        surface=req.surface,
-        max_tokens=500,
-        fc_mode="prompt",
-    )
-
-    try:
-        from .wire import build_openai_wire, openai_result_to_canonical
-        wire_body, wire_headers = build_openai_wire(summary_req, upstream_cfg, "")
-
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post(
-                f"{upstream_cfg.base_url}/chat/completions",
-                json=wire_body,
-                headers=wire_headers,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-
-        summary_result = openai_result_to_canonical(data, summary_req.model)
-        summary_text = summary_result.content or "对话历史摘要"
-    except Exception:
-        summary_text = f"[已压缩 {len(old_msgs)} 条历史消息]"
-
-    req.messages = [
-        Message(role="system", content=f"[历史对话摘要] {summary_text}"),
-        *recent_msgs,
-    ]
-
-
 def _stream_headers(fc_mode: str) -> Dict[str, str]:
     return {
         "Cache-Control": "no-cache",
@@ -327,6 +261,12 @@ async def _stream_gemini(
         if parsed:
             calls = parsed
             full = ""
+        else:
+            import re as _re
+            full = _re.sub(r"<[|\|] ?[|\|] ?(XYML|DSML)[|\|] ?[|\|] ?[^>]*>", "", full, flags=_re.IGNORECASE)
+            full = _re.sub(r"<[|\|] ?[|\|] ?(XYML|DSML)[|\|] ?[|\|] ?[^>]*>", "", full, flags=_re.IGNORECASE)
+            full = _re.sub(r"</[|\|] ?[|\|] ?(XYML|DSML)[|\|] ?[|\|] ?[^>]*>", "", full, flags=_re.IGNORECASE)
+            full = _re.sub(r"</[|\|] ?[|\|] ?(XYML|DSML)[|\|] ?[|\|] ?[^>]*>", "", full, flags=_re.IGNORECASE)
     from ..convert import gemini_response
 
     yield format_sse(gemini_response(model=req.model, content=full, tool_calls=calls or None))
@@ -744,9 +684,6 @@ async def handle_canonical(
     name_map: Dict[str, str] = {}
     if req.fc_mode == "prompt":
         name_map = _prepare_tools_for_prompt(req, config)
-
-    # 消息自动压缩
-    await _compress_messages(req, config, upstream_cfg)
 
     try:
         result = await _execute_once(
