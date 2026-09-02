@@ -21,7 +21,7 @@ def resolve_fc_mode(
     - native: keep tools fields, trust upstream FC
     - prompt: strip tools, inject XYML instructions, parse response
     """
-    if not req.tools:
+    if not req.tools and False:
         return "passthrough"
 
     override = (header_override or req.request_fc_override or "").strip().lower()
