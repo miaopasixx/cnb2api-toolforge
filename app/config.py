@@ -67,6 +67,11 @@ class FeaturesConfig:
     enable_streaming: bool = True
     enable_fc_error_retry: bool = True
     fc_error_retry_max: int = 2
+    compress_enabled: bool = False
+    compress_max_chars: int = 500000
+    compress_keep_recent: int = 10
+    compress_summary_model: str = ""
+
     strip_think_tags: bool = True
     inject_protocol: str = "XYML"
     convert_developer_to_system: bool = True
@@ -186,6 +191,10 @@ def load_config(path: str | Path) -> AppConfig:
             enable_streaming=bool(features_raw.get("enable_streaming", True)),
             enable_fc_error_retry=bool(features_raw.get("enable_fc_error_retry", True)),
             fc_error_retry_max=int(features_raw.get("fc_error_retry_max") or 2),
+            compress_enabled=bool(features_raw.get("compress_enabled", False)),
+            compress_max_chars=int(features_raw.get("compress_max_chars", 500000)),
+            compress_keep_recent=int(features_raw.get("compress_keep_recent", 10)),
+            compress_summary_model=str(features_raw.get("compress_summary_model", "")),
             strip_think_tags=bool(features_raw.get("strip_think_tags", True)),
             inject_protocol=str(features_raw.get("inject_protocol") or "XYML").strip(),
             convert_developer_to_system=bool(features_raw.get("convert_developer_to_system", True)),
