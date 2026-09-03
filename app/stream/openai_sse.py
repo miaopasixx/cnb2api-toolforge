@@ -78,7 +78,7 @@ async def stream_native_passthrough(
 
 def _filter_xyml_tags(text: str) -> str:
     """过滤残留的 XYML/DSML 标签，防止泄露到客户端。"""
-    return re.sub(r"</?[|｜] ?(XYML|DSML)[|｜][^>]*>", "", text, flags=re.IGNORECASE)
+    return re.sub(r"</?[|｜] ?[^>]*(XYML|DSML)[^>]*>", "", text, flags=re.IGNORECASE)
 async def stream_prompt_fc(
     line_iter: AsyncIterator[str],
     *,

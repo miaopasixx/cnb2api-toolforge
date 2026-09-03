@@ -263,10 +263,10 @@ async def _stream_gemini(
             full = ""
         else:
             import re as _re
-            full = _re.sub(r"<[|\|] ?(XYML|DSML)[|\|][^>]*>", "", full, flags=_re.IGNORECASE)
-            full = _re.sub(r"<[|\|] ?(XYML|DSML)[|\|][^>]*>", "", full, flags=_re.IGNORECASE)
-            full = _re.sub(r"</[|\|] ?(XYML|DSML)[|\|][^>]*>", "", full, flags=_re.IGNORECASE)
-            full = _re.sub(r"</[|\|] ?(XYML|DSML)[|\|][^>]*>", "", full, flags=_re.IGNORECASE)
+            full = _re.sub(r"</?[|\|] ?[^>]*(XYML|DSML)[^>]*>", "", full, flags=_re.IGNORECASE)
+            full = _re.sub(r"</?[|\|] ?[^>]*(XYML|DSML)[^>]*>", "", full, flags=_re.IGNORECASE)
+            full = _re.sub(r"</?[|\|] ?[^>]*(XYML|DSML)[^>]*>", "", full, flags=_re.IGNORECASE)
+            full = _re.sub(r"</?[|\|] ?[^>]*(XYML|DSML)[^>]*>", "", full, flags=_re.IGNORECASE)
     from ..convert import gemini_response
 
     yield format_sse(gemini_response(model=req.model, content=full, tool_calls=calls or None))
